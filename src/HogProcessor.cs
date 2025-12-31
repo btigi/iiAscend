@@ -38,4 +38,25 @@ public class HogProcessor
 
         return result;
     }
+
+    public void Write(string filename, List<(string filename, byte[] bytes)> files)
+    {
+        using var fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write);
+        using var binaryWriter = new BinaryWriter(fileStream);
+
+        binaryWriter.Write('D');
+        binaryWriter.Write('H');
+        binaryWriter.Write('F');
+
+        foreach (var (entryFilename, fileData) in files)
+        {
+            // Write filename as 13 bytes (8.3 format, null-padded)
+            var filenameBytes = System.Text.Encoding.ASCII.GetBytes(entryFilename);
+            var paddedFilename = new byte[13];
+            Array.Copy(filenameBytes, paddedFilename, Math.Min(filenameBytes.Length, 13));
+            binaryWriter.Write(paddedFilename);
+            binaryWriter.Write((uint)fileData.Length);
+            binaryWriter.Write(fileData);
+        }
+    }
 }
