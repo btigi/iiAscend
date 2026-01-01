@@ -1,4 +1,4 @@
-﻿iiAethra
+﻿iiAscend
 =========
 
 C# library supporting the modification of files relating to Descent, the 1995 FPS game developed by Parallax Software.
@@ -7,17 +7,29 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | Name  | Read | Write | Comment |
 |-------|:----:|-------|:--------|
 | 256   | ✗   |  ✗  |
-| DIG   | ✗   |  ✗  |
+| ADV   | ✗   |  ✗  | Plain text
+| B50   | ✗   |  ✗  | Plain text
+| BBM   | ✗   |  ✗  |
 | BNK   | ✗   |  ✗  |
+| CONF  | ✗   |  ✗  | Plain text
+| DEM   | ✗   |  ✗  |
+| DIG   | ✗   |  ✗  |
+| FAQ   | ✗   |  ✗  | Plain text
 | FNT   | ✗   |  ✗  |
 | HMP   | ✗   |  ✗  |
 | HMQ   | ✗   |  ✗  |
 | HOG   | ✔   |  ✗  |
+| INI   | ✗   |  ✗  | Plain text
+| M50   | ✗   |  ✗  | Plain text
 | MID   | ✗   |  ✗  | 
 | MN2   | ✗   |  ✗  |
+| MSN   | ✗   |  ✗  | Plain text
 | PCX   | ✗   |  ✗  |
+| PHX   | ✗   |  ✗  | Plain text
+| PIG   | ✗   |  ✗  |
 | RAW   | ✗   |  ✗  |
 | RL2   | ✗   |  ✗  |
+| SNG   | ✗   |  ✗  | Plain text
 | TXB   | ✔   |  ✔  |
 
 ## Usage
