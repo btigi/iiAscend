@@ -8,9 +8,17 @@ public class RawProcessor
 
     public byte[] Convert(string filename)
     {
-        // Read the raw audio data
         var rawData = File.ReadAllBytes(filename);
-        
+        return Convert(rawData);
+    }
+
+    public byte[] Convert(byte[] rawData)
+    {
+        return ConvertToWav(rawData);
+    }
+
+    private byte[] ConvertToWav(byte[] rawData)
+    {
         // Calculate WAV file parameters
         var dataSize = rawData.Length;
         var byteRate = SAMPLE_RATE * CHANNELS * BITS_PER_SAMPLE / 8;
