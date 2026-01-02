@@ -6,7 +6,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 
 | Name  | Read | Write | Comment |
 |-------|:----:|-------|:--------|
-| 256   | ✗   |  ✗  |
+| 256   | ✔   |  ✗  |
 | ADV   | ✗   |  ✗  | Plain text
 | B50   | ✗   |  ✗  | Plain text
 | BBM   | ✗   |  ✗  |
@@ -26,8 +26,8 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | MSN   | ✗   |  ✗  | Plain text
 | PCX   | ✗   |  ✗  |
 | PHX   | ✗   |  ✗  | Plain text
-| PIG   | ✗   |  ✗  |
-| RAW   | ✗   |  ✗  |
+| PIG   | ✔   |  ✗  |
+| RAW   | ✔   |  ✗  |
 | RL2   | ✗   |  ✗  |
 | SNG   | ✗   |  ✗  | Plain text
 | TXB   | ✔   |  ✔  |
