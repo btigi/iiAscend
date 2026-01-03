@@ -8,13 +8,13 @@ public class TwoFiveSixProcessor
     private const int FADE_TABLE_SIZE = 34 * 256; // 8704 bytes for fade table
     private const int TOTAL_FILE_SIZE = PALETTE_SIZE + FADE_TABLE_SIZE; // 9472 bytes
 
-    public TwoFiveSixFile Read(string filename)
+    public TwoFiveSixFile Read(string filename, bool bright = true)
     {
         var fileData = File.ReadAllBytes(filename);
-        return Read(fileData);
+        return Read(fileData, bright);
     }
 
-    public TwoFiveSixFile Read(byte[] fileData)
+    public TwoFiveSixFile Read(byte[] fileData, bool bright = true)
     {
         if (fileData.Length != TOTAL_FILE_SIZE)
         {
@@ -30,6 +30,15 @@ public class TwoFiveSixProcessor
             var red = fileData[offset];
             var green = fileData[offset + 1];
             var blue = fileData[offset + 2];
+            
+            if (bright)
+            {
+                // Multiply each RGB value by 4, clamping to 255
+                red = (byte)Math.Min(255, red * 4);
+                green = (byte)Math.Min(255, green * 4);
+                blue = (byte)Math.Min(255, blue * 4);
+            }
+            
             result.Palette[i] = (red, green, blue);
         }
 
