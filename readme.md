@@ -6,10 +6,10 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 
 | Name  | Read | Write | Comment |
 |-------|:----:|-------|:--------|
-| 256   | ✔   |  ✗  |
+| 256   | ✔   |  ✔  |
 | ADV   | ✗   |  ✗  | Plain text
 | B50   | ✗   |  ✗  | Plain text
-| BBM   | ✔   |  ✗  |
+| BBM   | 〰️   |  ✗  | Two variants
 | BNK   | ✗   |  ✗  |
 | CONF  | ✗   |  ✗  | Plain text
 | DEM   | ✗   |  ✗  |

@@ -14,7 +14,7 @@ public class TwoFiveSixProcessor
         return Read(fileData, bright);
     }
 
-    public TwoFiveSixFile Read(byte[] fileData, bool bright = true)
+    public TwoFiveSixFile Read(byte[] fileData, bool brighten = true)
     {
         if (fileData.Length != TOTAL_FILE_SIZE)
         {
@@ -31,7 +31,7 @@ public class TwoFiveSixProcessor
             var green = fileData[offset + 1];
             var blue = fileData[offset + 2];
             
-            if (bright)
+            if (brighten)
             {
                 // Multiply each RGB value by 4, clamping to 255
                 red = (byte)Math.Min(255, red * 4);
@@ -49,6 +49,42 @@ public class TwoFiveSixProcessor
             for (int colorIndex = 0; colorIndex < 256; colorIndex++)
             {
                 result.FadeTable[level][colorIndex] = fileData[fadeTableOffset + colorIndex];
+            }
+        }
+
+        return result;
+    }
+
+    public byte[] Write(TwoFiveSixFile file, bool darken = true)
+    {
+        var result = new byte[TOTAL_FILE_SIZE];
+
+        // Write palette
+        for (int i = 0; i < 256; i++)
+        {
+            var offset = i * 3;
+            var (red, green, blue) = file.Palette[i];
+            
+            if (darken)
+            {
+                // Divide each RGB value by 4
+                red = (byte)(red / 4);
+                green = (byte)(green / 4);
+                blue = (byte)(blue / 4);
+            }
+            
+            result[offset] = red;
+            result[offset + 1] = green;
+            result[offset + 2] = blue;
+        }
+
+        // Write fade table
+        for (int level = 0; level < 34; level++)
+        {
+            var fadeTableOffset = PALETTE_SIZE + (level * 256);
+            for (int colorIndex = 0; colorIndex < 256; colorIndex++)
+            {
+                result[fadeTableOffset + colorIndex] = file.FadeTable[level][colorIndex];
             }
         }
 
