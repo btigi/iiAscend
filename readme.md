@@ -15,7 +15,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | DEM   | ✗   |  ✗  |
 | DIG   | ✗   |  ✗  |
 | FAQ   | ✗   |  ✗  | Plain text
-| FNT   | ✗   |  ✗  |
+| FNT   | ✔   |  ✔  |
 | HMP   | ✗   |  ✗  |
 | HMQ   | ✗   |  ✗  |
 | HOG   | ✔   |  ✗  |
