@@ -9,7 +9,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | 256   | ✔   |  ✗  |
 | ADV   | ✗   |  ✗  | Plain text
 | B50   | ✗   |  ✗  | Plain text
-| BBM   | ✗   |  ✗  |
+| BBM   | ✔   |  ✗  |
 | BNK   | ✗   |  ✗  |
 | CONF  | ✗   |  ✗  | Plain text
 | DEM   | ✗   |  ✗  |
@@ -28,6 +28,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | PHX   | ✗   |  ✗  | Plain text
 | PIG   | ✔   |  ✗  |
 | RAW   | ✔   |  ✗  |
+| RDL   | ✗   |  ✗  |
 | RL2   | ✗   |  ✗  |
 | SNG   | ✗   |  ✗  | Plain text
 | TXB   | ✔   |  ✔  |
