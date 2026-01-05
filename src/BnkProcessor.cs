@@ -87,6 +87,57 @@ public class BnkProcessor
         };
     }
 
+    public void Write(string filename, BnkFile bnkFile)
+    {
+        var fileData = Write(bnkFile);
+        File.WriteAllBytes(filename, fileData);
+    }
+
+    public byte[] Write(BnkFile bnkFile)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+
+        const int headerSize = 28;
+        const int nameRecordSize = 12;
+
+        var offsetNameSection = headerSize;
+        var offsetDataSection = offsetNameSection + (bnkFile.NumRecordsTotal * nameRecordSize);
+
+        writer.Write(bnkFile.VersionMinor);
+        writer.Write(bnkFile.VersionMajor);
+        writer.Write(System.Text.Encoding.ASCII.GetBytes(ExpectedSignature));
+        writer.Write(bnkFile.NumRecordsTotal);
+        writer.Write(bnkFile.NumRecordsUsed);
+        writer.Write(offsetNameSection);
+        writer.Write(offsetDataSection);
+        writer.Write(new byte[8]); // 8 zero bytes
+
+        writer.BaseStream.Position = offsetNameSection;
+        foreach (var nameRecord in bnkFile.NameRecords)
+        {
+            writer.Write(nameRecord.IndexIntoDataSection);
+            writer.Write(nameRecord.Used);
+            var nameBytes = new byte[9];
+            var nameAscii = System.Text.Encoding.ASCII.GetBytes(nameRecord.InstrumentName);
+            Array.Copy(nameAscii, nameBytes, Math.Min(8, nameAscii.Length));
+            writer.Write(nameBytes);
+        }
+
+        writer.BaseStream.Position = offsetDataSection;
+        foreach (var instrument in bnkFile.Instruments)
+        {
+            writer.Write(instrument.InstrumentType);
+            writer.Write(instrument.VoiceNumber);
+            WriteOperator(writer, instrument.Operator0);
+            WriteOperator(writer, instrument.Operator1);
+            writer.Write(instrument.Operator0Waveform);
+            writer.Write(instrument.Operator1Waveform);
+        }
+
+        return stream.ToArray();
+    }
+
     private BnkOperatorParameters ReadOperator(BinaryReader reader)
     {
         return new BnkOperatorParameters
@@ -104,5 +155,21 @@ public class BnkProcessor
             EnvelopeScaling = reader.ReadByte(),
             Type = reader.ReadByte()
         };
+    }
+
+    private void WriteOperator(BinaryWriter writer, BnkOperatorParameters op)
+    {
+        writer.Write(op.KeyScaleLevel);
+        writer.Write(op.FrequencyMultiplier);
+        writer.Write(op.FeedBack);
+        writer.Write(op.AttackRate);
+        writer.Write(op.SustainLevel);
+        writer.Write(op.SustainingSound);
+        writer.Write(op.DecayRate);
+        writer.Write(op.OutputLevel);
+        writer.Write(op.AmplitudeVibrato);
+        writer.Write(op.FrequencyVibrato);
+        writer.Write(op.EnvelopeScaling);
+        writer.Write(op.Type);
     }
 }
