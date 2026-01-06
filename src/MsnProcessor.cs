@@ -31,6 +31,8 @@ public class MsnProcessor
         "custom_music"
     };
 
+    public List<string> CustomValidKeys { get; set; } = new();
+
     public MsnFile Read(string filename)
     {
         var content = File.ReadAllText(filename, Encoding.ASCII);
@@ -138,6 +140,11 @@ public class MsnProcessor
             {
                 validKeys.Add(key);
             }
+        }
+
+        foreach (var customKey in CustomValidKeys)
+        {
+            validKeys.Add(customKey);
         }
 
         foreach (var property in msnFile.Properties)
