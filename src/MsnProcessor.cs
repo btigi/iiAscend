@@ -4,8 +4,8 @@ namespace ii.Ascend;
 
 public class MsnProcessor
 {
-    // Standard MSN keys
-    private static readonly HashSet<string> StandardKeys = new(StringComparer.OrdinalIgnoreCase)
+    // Standard MSN (Descent 1) keys
+    private static readonly HashSet<string> StandardD1Keys = new(StringComparer.OrdinalIgnoreCase)
     {
         "name",
         "type",
@@ -15,8 +15,19 @@ public class MsnProcessor
         "num_secrets"
     };
 
-    // MNX extension keys
-    private static readonly HashSet<string> MnxExtensionKeys = new(StringComparer.OrdinalIgnoreCase)
+    // Standard MN2 (Descent 2) keys
+    private static readonly HashSet<string> StandardD2Keys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name",
+        "xname",      // alternative to name (unknown effect)
+        "zname",      // alternative to name (enables Vertigo Series mode)
+        "type",
+        "num_levels",
+        "num_secrets"
+    };
+
+    // MNX extension keys for Descent 1
+    private static readonly HashSet<string> MnxExtensionD1Keys = new(StringComparer.OrdinalIgnoreCase)
     {
         "author",
         "email",
@@ -31,7 +42,27 @@ public class MsnProcessor
         "custom_music"
     };
 
-    public List<string> CustomValidKeys { get; set; } = new();
+    // MNX extension keys for Descent 2
+    private static readonly HashSet<string> MnxExtensionD2Keys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "author",
+        "email",
+        "web_site",
+        "revision",
+        "date",
+        "build_time",
+        "normal",
+        "anarchy",
+        "robo_anarchy",
+        "coop",
+        "custom_music",
+        "capture_flag",
+        "hoard",
+        "custom_robots",
+        "custom_textures"
+    };
+
+    public List<string> CustomValidKeys { get; set; } = [];
 
     public MsnFile Read(string filename)
     {
@@ -130,15 +161,39 @@ public class MsnProcessor
         return true;
     }
 
-    public bool Validate(MsnFile msnFile, bool mnxExtensions = false)
+    public bool Validate(MsnFile msnFile, bool validateD1 = true, bool validateD2 = false, bool includeMnxExtensions = false)
     {
-        var validKeys = new HashSet<string>(StandardKeys, StringComparer.OrdinalIgnoreCase);
+        var validKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         
-        if (mnxExtensions)
+        if (validateD1)
         {
-            foreach (var key in MnxExtensionKeys)
+            foreach (var key in StandardD1Keys)
             {
                 validKeys.Add(key);
+            }
+
+            if (includeMnxExtensions)
+            {
+                foreach (var key in MnxExtensionD1Keys)
+                {
+                    validKeys.Add(key);
+                }
+            }
+        }
+
+        if (validateD2)
+        {
+            foreach (var key in StandardD2Keys)
+            {
+                validKeys.Add(key);
+            }
+
+            if (includeMnxExtensions)
+            {
+                foreach (var key in MnxExtensionD2Keys)
+                {
+                    validKeys.Add(key);
+                }
             }
         }
 
