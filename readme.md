@@ -23,8 +23,8 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | M50   | ✗   |  ✗  | Plain text
 | MID   | ✗   |  ✗  | 
 | MN2   | ✗   |  ✗  |
-| MSN   | ✗   |  ✗  | Plain text
-| PCX   | ✗   |  ✗  |
+| MSN   | ✔   |  ✗  | Plain text
+| PCX   | ✔   |  ✗  |
 | PHX   | ✗   |  ✗  | Plain text
 | PIG   | ✔   |  ✗  |
 | RAW   | ✔   |  ✗  |
