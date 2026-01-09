@@ -76,6 +76,66 @@ public class MsnProcessor
         return ReadInternal(content);
     }
 
+    public void Write(string filename, MsnFile msnFile)
+    {
+        var content = WriteInternal(msnFile);
+        File.WriteAllText(filename, content, Encoding.ASCII);
+    }
+
+    public byte[] Write(MsnFile msnFile)
+    {
+        var content = WriteInternal(msnFile);
+        return Encoding.ASCII.GetBytes(content);
+    }
+
+    private string WriteInternal(MsnFile msnFile)
+    {
+        var sb = new StringBuilder();
+        var levelFilenameIndex = 0;
+        var secretEntryIndex = 0;
+
+        foreach (var prop in msnFile.Properties)
+        {
+            // Write the property line
+            sb.Append(prop.Key);
+            sb.Append('=');
+            sb.Append(prop.Value);
+
+            if (!string.IsNullOrEmpty(prop.Comment))
+            {
+                sb.Append(';');
+                sb.Append(prop.Comment);
+            }
+
+            sb.AppendLine();
+
+            // Write level filenames after num_levels
+            if (prop.Key.Equals("num_levels", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(prop.Value, out var count))
+                {
+                    for (var i = 0; i < count && levelFilenameIndex < msnFile.LevelFilenames.Count; i++)
+                    {
+                        sb.AppendLine(msnFile.LevelFilenames[levelFilenameIndex++]);
+                    }
+                }
+            }
+            // Write secret entries after num_secrets
+            else if (prop.Key.Equals("num_secrets", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(prop.Value, out var count))
+                {
+                    for (var i = 0; i < count && secretEntryIndex < msnFile.SecretEntries.Count; i++)
+                    {
+                        sb.AppendLine(msnFile.SecretEntries[secretEntryIndex++]);
+                    }
+                }
+            }
+        }
+
+        return sb.ToString();
+    }
+
     private MsnFile ReadInternal(string content)
     {
         var result = new MsnFile();
