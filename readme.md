@@ -31,8 +31,8 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | RAW   | ✔   |  ✗  |
 | RDL   | ✗   |  ✗  |
 | RL2   | ✗   |  ✗  |
-| S11   | ✗   |  ✗  | 
-| S22   | ✗   |  ✗  |
+| S11   | ✔   |  ✗  | 
+| S22   | ✔   |  ✗  |
 | SNG   | ✗   |  ✗  | Plain text
 | TXB   | ✔   |  ✔  |
 
