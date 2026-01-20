@@ -41,4 +41,25 @@ public class SngProcessor
 
         return sngFile;
     }
+
+    public void Write(string filename, SngFile sngFile)
+    {
+        for (int i = 0; i < sngFile.Songs.Count; i++)
+        {
+            var song = sngFile.Songs[i];
+            if (string.IsNullOrWhiteSpace(song.Filename))
+                throw new ArgumentException($"Song entry at index {i} has an empty or null Filename.");
+            if (string.IsNullOrWhiteSpace(song.MelodicBankFile))
+                throw new ArgumentException($"Song entry at index {i} has an empty or null MelodicBankFile.");
+            if (string.IsNullOrWhiteSpace(song.DrumBankFile))
+                throw new ArgumentException($"Song entry at index {i} has an empty or null DrumBankFile.");
+        }
+
+        using var writer = new StreamWriter(filename, false, System.Text.Encoding.Default);
+        
+        foreach (var song in sngFile.Songs)
+        {
+            writer.WriteLine($"{song.Filename}\t{song.MelodicBankFile}\t{song.DrumBankFile}");
+        }
+    }
 }

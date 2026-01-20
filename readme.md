@@ -33,7 +33,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | RL2   | ✗   |  ✗  |
 | S11   | ✔   |  ✗  | 
 | S22   | ✔   |  ✗  |
-| SNG   | ✗   |  ✗  | Plain text
+| SNG   | ✔   |  ✔  | Plain text
 | TXB   | ✔   |  ✔  |
 
 ## Usage
