@@ -67,4 +67,58 @@ public class SProcessor
 
         return sounds;
     }
+
+    public void Write(string filename, List<SoundInfo> sounds)
+    {
+        if (sounds == null)
+            throw new ArgumentNullException(nameof(sounds));
+
+        if (sounds.Count == 0)
+            throw new ArgumentException("Sound list cannot be empty.", nameof(sounds));
+
+        for (var i = 0; i < sounds.Count; i++)
+        {
+            var sound = sounds[i];
+            if (string.IsNullOrWhiteSpace(sound.Filename))
+                throw new ArgumentException($"Sound entry at index {i} has an empty or null Filename.");
+            if (sound.Data == null || sound.Data.Length == 0)
+                throw new ArgumentException($"Sound entry at index {i} has null or empty Data.");
+        }
+
+        using var stream = new FileStream(filename, FileMode.Create, FileAccess.Write);
+        using var writer = new BinaryWriter(stream);
+
+        writer.Write(System.Text.Encoding.ASCII.GetBytes("DSND"));
+        writer.Write(SNDFILE_VERSION);
+        writer.Write(sounds.Count);
+
+        var headerStart = (int)stream.Position;
+        var headerSize = sounds.Count * 20; // DiskSoundHeader is 20 bytes
+        var dataStart = headerStart + headerSize;
+
+        var currentDataOffset = 0;
+        for (var i = 0; i < sounds.Count; i++)
+        {
+            var sound = sounds[i];
+            
+            var name = Path.GetFileNameWithoutExtension(sound.Filename);
+            
+            var nameBytes = new byte[8];
+            var nameBytesToWrite = System.Text.Encoding.ASCII.GetBytes(name);
+            var copyLength = Math.Min(8, nameBytesToWrite.Length);
+            Array.Copy(nameBytesToWrite, 0, nameBytes, 0, copyLength);
+            
+            writer.Write(nameBytes);
+            writer.Write((int)sound.UncompressedLength);
+            writer.Write(sound.Data.Length);
+            writer.Write(currentDataOffset);
+            
+            currentDataOffset += sound.Data.Length;
+        }
+
+        foreach (var sound in sounds)
+        {
+            writer.Write(sound.Data);
+        }
+    }
 }
