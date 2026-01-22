@@ -5,6 +5,17 @@ public class TxbProcessor
     public string Read(string filename)
     {
         var fileBytes = File.ReadAllBytes(filename);
+        return Read(fileBytes);
+    }
+
+    public string Read(byte[] fileBytes)
+    {
+        var decryptedBytes = DecryptBytes(fileBytes);
+        return System.Text.Encoding.UTF8.GetString(decryptedBytes);
+    }
+
+    private byte[] DecryptBytes(byte[] fileBytes)
+    {
         var decryptedBytes = new List<byte>();
 
         foreach (var currentByte in fileBytes)
@@ -22,7 +33,7 @@ public class TxbProcessor
             }
         }
 
-        return System.Text.Encoding.UTF8.GetString(decryptedBytes.ToArray());
+        return decryptedBytes.ToArray();
     }
 
     public void Write(string filename, string content)
