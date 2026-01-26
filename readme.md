@@ -16,6 +16,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | DIG   | ✗   |  ✗  |
 | FAQ   | ✗   |  ✗  | Plain text
 | FNT   | ✔   |  ✔  |
+| HAM   | ✗   |  ✗  |
 | HMP   | ✗   |  ✗  |
 | HMQ   | ✗   |  ✗  |
 | HOG   | ✔   |  ✔  |
@@ -24,7 +25,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | MID   | ✗   |  ✗  | 
 | MN2   | ✔   |  ✔  |
 | MSN   | ✔   |  ✔  | Plain text
-| MVL   | ✗   |  ✗  |
+| MVL   | ✔   |  ✔  |
 | PCX   | ✔   |  ✗  |
 | PHX   | ✗   |  ✗  | Plain text
 | PIG   | ✔   |  ✗  | D1, D2
