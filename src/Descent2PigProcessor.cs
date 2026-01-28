@@ -94,7 +94,7 @@ public class Descent2PigProcessor : IPigProcessor
         return result;
     }
 
-    public (List<ImageInfo> images, List<SoundInfo> sounds) ReadDetailed(string filename)
+    public (List<ImageInfo> images, List<SoundInfo> sounds, Model.D1PigGameData? gameData) ReadDetailed(string filename)
     {
         using var fileStream = new FileStream(filename, FileMode.Open, FileAccess.Read);
         using var binaryReader = new BinaryReader(fileStream);
@@ -173,9 +173,10 @@ public class Descent2PigProcessor : IPigProcessor
             });
         }
 
-		// Note: Descent 2 PIG files do not have sounds (they are in .S11/.S22 files)
-		var sounds = new List<SoundInfo>();
+        // Note: Descent 2 PIG files do not have sounds (they are in .S11/.S22 files)
+        var sounds = new List<SoundInfo>();
 
-        return (images, sounds);
+        // D2 PIG files don't have embedded game data (that's in the HAM file)
+        return (images, sounds, null);
     }
 }

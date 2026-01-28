@@ -19,7 +19,7 @@ public class PigProcessor : IPigProcessor
         return processor.Read(filename);
     }
 
-    public (List<ImageInfo> images, List<SoundInfo> sounds) ReadDetailed(string filename)
+    public (List<ImageInfo> images, List<SoundInfo> sounds, Model.D1PigGameData? gameData) ReadDetailed(string filename)
     {
         var processor = GetProcessor(filename);
         return processor.ReadDetailed(filename);
