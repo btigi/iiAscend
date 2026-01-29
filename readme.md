@@ -12,20 +12,19 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | DEM   | ✗   |  ✗  |
 | DIG   | ✗   |  ✗  |
 | FNT   | ✔   |  ✔  |
-| HAM   | ✔   |  ✗  |
+| HAM   | ✔   |  ✔  |
 | HMP   | ✗   |  ✗  |
 | HMQ   | ✗   |  ✗  |
 | HOG   | ✔   |  ✔  |
 | INI   | ✗   |  ✗  | Plain text
-| MID   | ✗   |  ✗  | 
+| MID   | ✔   |  ✗  | 
 | MN2   | ✔   |  ✔  |
 | MSN   | ✔   |  ✔  | Plain text
 | MVL   | ✔   |  ✔  |
 | PCX   | ✔   |  ✗  |
-| PHX   | ✗   |  ✗  | Plain text
 | PIG   | ✔   |  ✗  | D1, D2
 | RAW   | ✔   |  ✗  |
-| RDL   | ✗   |  ✗  |
+| RDL   | ✔   |  ✔  |
 | RL2   | ✗   |  ✗  |
 | S11   | ✔   |  ✔  | 
 | S22   | ✔   |  ✔  |
