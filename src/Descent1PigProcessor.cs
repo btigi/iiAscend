@@ -124,7 +124,7 @@ public class Descent1PigProcessor : IPigProcessor
         return result;
     }
 
-    public (List<ImageInfo> images, List<SoundInfo> sounds, D1PigGameData? gameData) ReadDetailed(string filename)
+    public (List<ImageInfo> images, List<SoundInfo> sounds, List<(string filename, byte[] data)> pofFiles, D1PigGameData? gameData) ReadDetailed(string filename)
     {
         using var fileStream = new FileStream(filename, FileMode.Open, FileAccess.Read);
         using var binaryReader = new BinaryReader(fileStream);
@@ -237,7 +237,60 @@ public class Descent1PigProcessor : IPigProcessor
             });
         }
 
-        return (images, sounds, gameData);
+        var pofFiles = new List<(string filename, byte[] data)>();
+        var pofProcessor = new PofProcessor();
+        
+        if (gameData != null && gameData.PolygonModels != null)
+        {
+            for (int i = 0; i < gameData.NumPolygonModels && i < gameData.PolygonModels.Count; i++)
+            {
+                var model = gameData.PolygonModels[i];
+                if (model.ModelData == null || model.ModelData.Length == 0)
+                    continue;
+
+                string pofFilename = $"model{i:D2}.pof";
+                
+                var robot = gameData.Robots.FirstOrDefault(r => r.ModelNum == i);
+                if (robot != null)
+                {
+                    var robotIndex = gameData.Robots.IndexOf(robot);
+                    pofFilename = $"robot{robotIndex:D2}.pof";
+                }
+                else
+                {
+                    var weapon = gameData.Weapons.FirstOrDefault(w => w.ModelNum == i || w.ModelNumInner == i);
+                    if (weapon != null)
+                    {
+                        var weaponIndex = gameData.Weapons.IndexOf(weapon);
+                        pofFilename = $"weapon{weaponIndex:D2}.pof";
+                    }
+                    else if (i == gameData.PlayerShip.ModelNum)
+                    {
+                        pofFilename = "player.pof";
+                    }
+                    else if (i == gameData.ExitModelNum)
+                    {
+                        pofFilename = "exit01.pof";
+                    }
+                    else if (i == gameData.DestroyedExitModelNum)
+                    {
+                        pofFilename = "exit01d.pof";
+                    }
+                }
+
+                try
+                {
+                    var pofData = pofProcessor.Write(model);
+                    pofFiles.Add((pofFilename, pofData));
+                }
+                catch
+                {
+                    // Skip models that can't be converted
+                }
+            }
+        }
+
+        return (images, sounds, pofFiles, gameData);
     }
 
     #region Game Data Reading

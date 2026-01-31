@@ -21,4 +21,5 @@ public class PolyModel
     public byte NumTextures { get; set; }
     public ushort FirstTexture { get; set; }
     public byte SimplerModel { get; set; }
+    public List<string> TextureNames { get; set; } = new List<string>();
 }

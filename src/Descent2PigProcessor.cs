@@ -94,7 +94,7 @@ public class Descent2PigProcessor : IPigProcessor
         return result;
     }
 
-    public (List<ImageInfo> images, List<SoundInfo> sounds, Model.D1PigGameData? gameData) ReadDetailed(string filename)
+    public (List<ImageInfo> images, List<SoundInfo> sounds, List<(string filename, byte[] data)> pofFiles, Model.D1PigGameData? gameData) ReadDetailed(string filename)
     {
         using var fileStream = new FileStream(filename, FileMode.Open, FileAccess.Read);
         using var binaryReader = new BinaryReader(fileStream);
@@ -177,6 +177,6 @@ public class Descent2PigProcessor : IPigProcessor
         var sounds = new List<SoundInfo>();
 
         // D2 PIG files don't have embedded game data (that's in the HAM file)
-        return (images, sounds, null);
+        return (images, sounds, new List<(string filename, byte[] data)>(), null);
     }
 }
