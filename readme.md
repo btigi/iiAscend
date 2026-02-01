@@ -23,6 +23,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | MVL   | ✔   |  ✔  |
 | PCX   | ✔   |  ✗  |
 | PIG   | ✔   |  ✗  | D1, D2
+| POF   | ✔   |  ✔  |
 | RAW   | ✔   |  ✗  |
 | RDL   | ✔   |  ✔  |
 | RL2   | ✗   |  ✗  |

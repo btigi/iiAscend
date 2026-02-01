@@ -7,13 +7,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
-    <Copyright>Copyright ©  2025</Copyright>
+    <Copyright>Copyright ©  2026</Copyright>
     <Title>ii.Ascend</Title>
-    <Version>0.1.0.0</Version>
+    <Version>0.4.0.0</Version>
     <Authors>iggti</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/btigi/iiAscend/</RepositoryUrl>
-    <Description>C# library supporting the modification of files relating to Descent, the 1995 FPS game developed by Parallax Software.</Description>
+    <Description>C# library supporting the modification of files relating to Descent (1995) and Descent 2 (1996), the six-degree-of-freedom games developed by Parallax Software.</Description>
     <PackageTags>descent;parallax software</PackageTags>
     <PackageReadmeFile>readme.md</PackageReadmeFile>
   </PropertyGroup>
