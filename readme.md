@@ -1,4 +1,4 @@
-﻿iiAscend
+iiAscend
 =========
 
 C# library supporting the modification of files relating to Descent, the 1995 FPS game developed by Parallax Software.
@@ -9,7 +9,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | 256   | ✔   |  ✔  |
 | BBM   | ✔   |  ✗  | Two variants
 | BNK   | ✔   |  ✔  |
-| DEM   | ✗   |  ✗  |
+| DEM   | ✔   |  ✗  |
 | DIG   | ✗   |  ✗  |
 | FNT   | ✔   |  ✔  |
 | HAM   | ✔   |  ✔  |
@@ -54,6 +54,15 @@ foreach (var (filename, bytes) in files)
 
 var txbProcessor = new TxbProcessor();
 var text = txbProcessor.Read(@"D:\data\descent\credits.txb");
+
+var demProcessor = new DemProcessor();
+var demo = demProcessor.Read(@"D:\data\descent\demo1.dem");
+Console.WriteLine($"Demo version: {demo.Version}, Game type: {demo.GameType}");
+Console.WriteLine($"Total events: {demo.Events.Count}");
+foreach (var evt in demo.Events.Take(10))
+{
+    Console.WriteLine($"Event type: {evt.EventType}");
+}
 ```
 
 ## Compiling
