@@ -9,7 +9,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | 256   | ✔   |  ✔  |
 | BBM   | ✔   |  ✗  | Two variants
 | BNK   | ✔   |  ✔  |
-| DEM   | ✔   |  ✗  |
+| DEM   | ✔   |  ✔  |
 | DIG   | ✗   |  ✗  |
 | FNT   | ✔   |  ✔  |
 | HAM   | ✔   |  ✔  |
@@ -55,14 +55,18 @@ foreach (var (filename, bytes) in files)
 var txbProcessor = new TxbProcessor();
 var text = txbProcessor.Read(@"D:\data\descent\credits.txb");
 
+// Reading a Descent 1 demo: extract game data from the PIG file first
+var pigProcessor = new Descent1PigProcessor();
+var (_, _, _, gameData) = pigProcessor.ReadDetailed(@"D:\Games\Descent\DESCENT.PIG");
+
+var robotModelNums = gameData.Robots.Select(r => r.ModelNum).ToArray();
+var robotIsBoss = gameData.Robots.Select(r => r.BossFlag != 0).ToArray();
+var polyModelNumSubmodels = gameData.PolygonModels.Select(p => p.NumModels).ToArray();
+
 var demProcessor = new DemProcessor();
-var demo = demProcessor.Read(@"D:\data\descent\demo1.dem");
+var demo = demProcessor.Read(@"D:\data\descent\demo1.dem", robotModelNums, robotIsBoss, polyModelNumSubmodels);
 Console.WriteLine($"Demo version: {demo.Version}, Game type: {demo.GameType}");
 Console.WriteLine($"Total events: {demo.Events.Count}");
-foreach (var evt in demo.Events.Take(10))
-{
-    Console.WriteLine($"Event type: {evt.EventType}");
-}
 ```
 
 ## Compiling

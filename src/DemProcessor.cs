@@ -5,9 +5,9 @@ namespace ii.Ascend;
 public class DemProcessor
 {
 	// Game mode flags
-	private const int GM_MULTI = 1;
-	private const int GM_TEAM = 2;
-	private const int GM_MULTI_COOP = 4;
+	private const int GM_MULTI = 38;
+	private const int GM_MULTI_COOP = 16;
+	private const int GM_TEAM = 256;
 
 	// Object type constants
 	private const byte OBJ_ROBOT = 2;
@@ -48,50 +48,692 @@ public class DemProcessor
 	private byte _gameType;
 	private bool _justStartedPlayback;
 
-	public DemFile Read(string filename)
+	// Game data lookups
+	private int[] _robotModelNums = [];
+	private bool[] _robotIsBoss = [];
+	private int[] _polyModelNumSubmodels = [];
+
+	public DemFile Read(string filename, int[] robotModelNums, bool[] robotIsBoss, int[] polyModelNumSubmodels)
 	{
 		var fileData = File.ReadAllBytes(filename);
-		return Read(fileData);
+		return Read(fileData, robotModelNums, robotIsBoss, polyModelNumSubmodels);
 	}
 
-	public DemFile Read(byte[] fileData)
+	public DemFile Read(byte[] fileData, int[] robotModelNums, bool[] robotIsBoss, int[] polyModelNumSubmodels)
 	{
 		using var stream = new MemoryStream(fileData);
 		using var reader = new BinaryReader(stream);
 
+		_robotModelNums = robotModelNums;
+		_robotIsBoss = robotIsBoss;
+		_polyModelNumSubmodels = polyModelNumSubmodels;
+
 		var demFile = new DemFile();
 		_justStartedPlayback = false;
 
-		while (stream.Position < stream.Length)
+		try
 		{
-			var eventType = reader.ReadByte();
-			var demEvent = ReadEvent(reader, eventType);
-
-			if (demEvent != null)
+			while (stream.Position < stream.Length)
 			{
-				demFile.Events.Add(demEvent);
+				var eventType = reader.ReadByte();
+				var demEvent = ReadEvent(reader, eventType);
 
-				if (eventType == DemEventTypes.StartDemo && demEvent is DemStartDemoEvent startDemo)
+				if (demEvent != null)
 				{
-					_version = startDemo.Version;
-					_gameType = startDemo.GameType;
-					demFile.Version = _version;
-					demFile.GameType = _gameType;
-					_justStartedPlayback = true;
-				}
+					demFile.Events.Add(demEvent);
 
-				// Handle NEW_LEVEL event to reset JustStartedPlayback
-				if (eventType == DemEventTypes.NewLevel && _gameType == 3)
-				{
-					_justStartedPlayback = false;
-				}
+					if (eventType == DemEventTypes.StartDemo && demEvent is DemStartDemoEvent startDemo)
+					{
+						_version = startDemo.Version;
+						_gameType = startDemo.GameType;
+						demFile.Version = _version;
+						demFile.GameType = _gameType;
+						_justStartedPlayback = true;
+					}
 
-				if (eventType == DemEventTypes.Eof)
-					break;
+					if (eventType == DemEventTypes.NewLevel && _gameType == 3)
+					{
+						_justStartedPlayback = false;
+					}
+
+					if (eventType == DemEventTypes.Eof)
+					{
+						// Unused data?
+						var remaining = (int)(stream.Length - stream.Position);
+						if (remaining > 0)
+						{
+							demFile.TrailingData = reader.ReadBytes(remaining);
+						}
+						break;
+					}
+				}
 			}
+		}
+		catch (EndOfStreamException)
+		{
+			// Nothing :(
 		}
 
 		return demFile;
+	}
+
+	public void Write(string filename, DemFile demFile, int[] robotModelNums, bool[] robotIsBoss, int[] polyModelNumSubmodels)
+	{
+		var fileData = Write(demFile, robotModelNums, robotIsBoss, polyModelNumSubmodels);
+		File.WriteAllBytes(filename, fileData);
+	}
+
+	public byte[] Write(DemFile demFile, int[] robotModelNums, bool[] robotIsBoss, int[] polyModelNumSubmodels)
+	{
+		using var stream = new MemoryStream();
+		using var writer = new BinaryWriter(stream);
+
+		_robotModelNums = robotModelNums;
+		_robotIsBoss = robotIsBoss;
+		_polyModelNumSubmodels = polyModelNumSubmodels;
+
+		_justStartedPlayback = false;
+		_gameType = demFile.GameType;
+		_version = demFile.Version;
+
+		foreach (var evt in demFile.Events)
+		{
+			writer.Write(evt.EventType);
+			WriteEvent(writer, evt);
+
+			if (evt is DemStartDemoEvent startDemo)
+			{
+				_version = startDemo.Version;
+				_gameType = startDemo.GameType;
+				_justStartedPlayback = true;
+			}
+
+			if (evt.EventType == DemEventTypes.NewLevel && _gameType == 3)
+			{
+				_justStartedPlayback = false;
+			}
+		}
+
+		// Write any trailing data
+		if (demFile.TrailingData.Length > 0)
+		{
+			writer.Write(demFile.TrailingData);
+		}
+
+		return stream.ToArray();
+	}
+
+	private int GetModelNumForObject(DemObject obj)
+	{
+		if (obj.Type == OBJ_ROBOT && obj.Id < _robotModelNums.Length)
+		{
+			return _robotModelNums[obj.Id];
+		}
+
+		if (obj.Type == OBJ_PLAYER)
+		{
+			return 0;
+		}
+
+		if (obj.Type == OBJ_CLUTTER)
+		{
+			return obj.Id;
+		}
+
+		return obj.ModelNum ?? 0;
+	}
+
+	private int GetNumSubmodels(int modelNum)
+	{
+		if (modelNum >= 0 && modelNum < _polyModelNumSubmodels.Length)
+		{
+			return _polyModelNumSubmodels[modelNum];
+		}
+		return 0;
+	}
+
+	private bool IsRobotBoss(byte robotId)
+	{
+		if (robotId < _robotIsBoss.Length)
+		{
+			return _robotIsBoss[robotId];
+		}
+		return false;
+	}
+
+	private void WriteEvent(BinaryWriter writer, IDemEvent evt)
+	{
+		switch (evt)
+		{
+			case DemEofEvent:
+				break;
+			case DemStartDemoEvent e:
+				WriteStartDemoEvent(writer, e);
+				break;
+			case DemStartFrameEvent e:
+				WriteStartFrameEvent(writer, e);
+				break;
+			case DemViewerObjectEvent e:
+				WriteViewerObjectEvent(writer, e);
+				break;
+			case DemRenderObjectEvent e:
+				WriteRenderObjectEvent(writer, e);
+				break;
+			case DemSoundEvent e:
+				writer.Write(e.SoundNo);
+				break;
+			case DemSoundOnceEvent e:
+				writer.Write(e.SoundNo);
+				break;
+			case DemSound3DEvent e:
+				writer.Write(e.SoundNo);
+				writer.Write(e.Angle);
+				writer.Write(e.Volume);
+				break;
+			case DemWallHitProcessEvent e:
+				writer.Write(e.SegNum);
+				writer.Write(e.Side);
+				writer.Write(e.Damage);
+				writer.Write(e.Player);
+				break;
+			case DemTriggerEvent e:
+				WriteTriggerEvent(writer, e);
+				break;
+			case DemHostageRescuedEvent e:
+				writer.Write(e.HostageNumber);
+				break;
+			case DemSound3DOnceEvent e:
+				writer.Write(e.SoundNo);
+				writer.Write(e.Angle);
+				writer.Write(e.Volume);
+				break;
+			case DemMorphFrameEvent e:
+				WriteObject(writer, e.Object);
+				break;
+			case DemWallToggleEvent e:
+				writer.Write(e.SegNum);
+				writer.Write(e.Side);
+				break;
+			case DemHudMessageEvent e:
+				WriteLengthPrefixedString(writer, e.Message);
+				break;
+			case DemControlCenterDestroyedEvent e:
+				writer.Write(e.CountdownSecondsLeft);
+				break;
+			case DemPaletteEffectEvent e:
+				writer.Write(e.Red);
+				writer.Write(e.Green);
+				writer.Write(e.Blue);
+				break;
+			case DemPlayerEnergyEvent e:
+				WritePlayerEnergyEvent(writer, e);
+				break;
+			case DemPlayerShieldEvent e:
+				WritePlayerShieldEvent(writer, e);
+				break;
+			case DemPlayerFlagsEvent e:
+				writer.Write(e.OldFlags);
+				writer.Write(e.Flags);
+				break;
+			case DemPlayerWeaponEvent e:
+				WritePlayerWeaponEvent(writer, e);
+				break;
+			case DemEffectBlowupEvent e:
+				writer.Write(e.SegNum);
+				writer.Write(e.Side);
+				WriteVector(writer, e.Point);
+				break;
+			case DemHomingDistanceEvent e:
+				writer.Write(e.Distance);
+				break;
+			case DemLetterboxEvent:
+				break;
+			case DemRestoreCockpitEvent:
+				break;
+			case DemRearviewEvent:
+				break;
+			case DemWallSetTmapNum1Event e:
+				writer.Write(e.Seg);
+				writer.Write(e.Side);
+				writer.Write(e.CSeg);
+				writer.Write(e.CSide);
+				writer.Write(e.Tmap);
+				break;
+			case DemWallSetTmapNum2Event e:
+				writer.Write(e.Seg);
+				writer.Write(e.Side);
+				writer.Write(e.CSeg);
+				writer.Write(e.CSide);
+				writer.Write(e.Tmap);
+				break;
+			case DemNewLevelEvent e:
+				WriteNewLevelEvent(writer, e);
+				break;
+			case DemMultiCloakEvent e:
+				writer.Write(e.PlayerNum);
+				break;
+			case DemMultiDecloakEvent e:
+				writer.Write(e.PlayerNum);
+				break;
+			case DemRestoreRearviewEvent:
+				break;
+			case DemMultiDeathEvent e:
+				writer.Write(e.PlayerNum);
+				break;
+			case DemMultiKillEvent e:
+				writer.Write(e.PlayerNum);
+				writer.Write(e.Kills);
+				break;
+			case DemMultiConnectEvent e:
+				WriteMultiConnectEvent(writer, e);
+				break;
+			case DemMultiReconnectEvent e:
+				writer.Write(e.PlayerNum);
+				break;
+			case DemMultiDisconnectEvent e:
+				writer.Write(e.PlayerNum);
+				break;
+			case DemMultiScoreEvent e:
+				writer.Write(e.PlayerNum);
+				writer.Write(e.Score);
+				break;
+			case DemPlayerScoreEvent e:
+				writer.Write(e.Score);
+				break;
+			case DemPrimaryAmmoEvent e:
+				writer.Write(e.OldAmmo);
+				writer.Write(e.NewAmmo);
+				break;
+			case DemSecondaryAmmoEvent e:
+				writer.Write(e.OldAmmo);
+				writer.Write(e.NewAmmo);
+				break;
+			case DemDoorOpeningEvent e:
+				writer.Write(e.SegNum);
+				writer.Write(e.Side);
+				break;
+			case DemLaserLevelEvent e:
+				if (_gameType == 3) // D2 uses shorts
+				{
+					writer.Write(e.OldLevel);
+					writer.Write(e.NewLevel);
+				}
+				else // D1 uses bytes
+				{
+					writer.Write((byte)e.OldLevel);
+					writer.Write((byte)e.NewLevel);
+				}
+				break;
+			case DemPlayerAfterburnerEvent e:
+				writer.Write(e.OldAfterburner);
+				writer.Write(e.Afterburner);
+				break;
+			case DemCloakingWallEvent e:
+				writer.Write(e.FrontWallNum);
+				writer.Write(e.BackWallNum);
+				writer.Write(e.Type);
+				writer.Write(e.State);
+				writer.Write(e.CloakValue);
+				writer.Write(e.L0);
+				writer.Write(e.L1);
+				writer.Write(e.L2);
+				writer.Write(e.L3);
+				break;
+			case DemChangeCockpitEvent e:
+				writer.Write(e.Cockpit);
+				break;
+			case DemStartGuidedEvent:
+				break;
+			case DemEndGuidedEvent:
+				break;
+			case DemSecretThingyEvent e:
+				writer.Write(e.Truth);
+				break;
+			case DemLinkSoundToObjectEvent e:
+				writer.Write(e.SoundNo);
+				writer.Write(e.Signature);
+				writer.Write(e.MaxVolume);
+				writer.Write(e.MaxDistance);
+				writer.Write(e.LoopStart);
+				writer.Write(e.LoopEnd);
+				break;
+			case DemKillSoundToObjectEvent e:
+				writer.Write(e.Signature);
+				break;
+		}
+	}
+
+	private void WriteStartDemoEvent(BinaryWriter writer, DemStartDemoEvent evt)
+	{
+		writer.Write(evt.Version);
+		writer.Write(evt.GameType);
+		writer.Write(evt.GameTime);
+		writer.Write(evt.GameMode);
+
+		if (evt.GameType == 1)
+		{
+			if ((evt.GameMode & GM_MULTI) != 0)
+			{
+				writer.Write(evt.TeamVector ?? 0);
+			}
+		}
+		else
+		{
+			if ((evt.GameMode & GM_TEAM) != 0)
+			{
+				writer.Write(evt.TeamVector ?? 0);
+				WriteLengthPrefixedString(writer, evt.TeamName0 ?? string.Empty);
+				WriteLengthPrefixedString(writer, evt.TeamName1 ?? string.Empty);
+			}
+
+			if ((evt.GameMode & GM_MULTI) != 0)
+			{
+				writer.Write(evt.NumPlayers ?? 0);
+				if (evt.Players != null)
+				{
+					foreach (var player in evt.Players)
+					{
+						WriteLengthPrefixedString(writer, player.Callsign);
+						writer.Write(player.Connected);
+
+						if ((evt.GameMode & GM_MULTI_COOP) != 0)
+						{
+							writer.Write(player.Score ?? 0);
+						}
+						else
+						{
+							writer.Write(player.NetKilledTotal ?? 0);
+							writer.Write(player.NetKillsTotal ?? 0);
+						}
+					}
+				}
+			}
+			else
+			{
+				writer.Write(evt.PlayerScore ?? 0);
+			}
+
+			for (int i = 0; i < MAX_PRIMARY_WEAPONS; i++)
+			{
+				writer.Write(evt.PrimaryAmmo != null && i < evt.PrimaryAmmo.Length ? evt.PrimaryAmmo[i] : (short)0);
+			}
+
+			for (int i = 0; i < MAX_SECONDARY_WEAPONS; i++)
+			{
+				writer.Write(evt.SecondaryAmmo != null && i < evt.SecondaryAmmo.Length ? evt.SecondaryAmmo[i] : (short)0);
+			}
+
+			writer.Write(evt.LaserLevel);
+			WriteLengthPrefixedString(writer, evt.CurrentMission);
+		}
+
+		writer.Write(evt.Energy);
+		writer.Write(evt.Shield);
+		writer.Write(evt.Flags);
+		writer.Write(evt.PrimaryWeapon);
+		writer.Write(evt.SecondaryWeapon);
+	}
+
+	private void WriteStartFrameEvent(BinaryWriter writer, DemStartFrameEvent evt)
+	{
+		writer.Write(evt.LastFrameLength);
+		writer.Write(evt.FrameCount);
+		writer.Write(evt.RecordedTime);
+	}
+
+	private void WriteViewerObjectEvent(BinaryWriter writer, DemViewerObjectEvent evt)
+	{
+		if (_gameType == 3)
+		{
+			writer.Write(evt.WhichWindow ?? 0);
+		}
+
+		WriteObject(writer, evt.Object);
+	}
+
+	private void WriteRenderObjectEvent(BinaryWriter writer, DemRenderObjectEvent evt)
+	{
+		WriteObject(writer, evt.Object);
+	}
+
+	private void WriteObject(BinaryWriter writer, DemObject obj)
+	{
+		writer.Write(obj.RenderType);
+		writer.Write(obj.Type);
+
+		if (obj.RenderType == RT_NONE && obj.Type != OBJ_CAMERA)
+		{
+			return;
+		}
+
+		writer.Write(obj.Id);
+		writer.Write(obj.Flags);
+		writer.Write(obj.Signature);
+		WriteShortPos(writer, obj);
+
+		switch (obj.Type)
+		{
+			case OBJ_HOSTAGE:
+				break;
+			case OBJ_ROBOT:
+				break;
+			case OBJ_POWERUP:
+				writer.Write(obj.MovementType);
+				break;
+			case OBJ_PLAYER:
+				break;
+			case OBJ_CLUTTER:
+				break;
+			default:
+				writer.Write(obj.ControlType);
+				writer.Write(obj.MovementType);
+				break;
+		}
+
+		if (obj.Type != OBJ_ROBOT && obj.Type != OBJ_HOSTAGE &&
+			obj.Type != OBJ_PLAYER && obj.Type != OBJ_POWERUP && obj.Type != OBJ_CLUTTER)
+		{
+			writer.Write(obj.Size ?? 0);
+		}
+
+		WriteVector(writer, obj.LastPos);
+
+		if (obj.Type == OBJ_WEAPON && obj.RenderType == RT_WEAPON_VCLIP)
+		{
+			writer.Write(obj.Lifeleft ?? 0);
+		}
+		else
+		{
+			writer.Write(obj.LifeleftByte ?? (byte)0);
+		}
+
+		if (_gameType >= 2 && obj.Type == OBJ_ROBOT && IsRobotBoss(obj.Id))
+		{
+			writer.Write((byte)(obj.Cloaked == true ? 1 : 0));
+		}
+
+		switch (obj.MovementType)
+		{
+			case MT_PHYSICS:
+				WriteVector(writer, obj.Velocity ?? new VmsVector());
+				WriteVector(writer, obj.Thrust ?? new VmsVector());
+				break;
+			case MT_SPINNING:
+				WriteVector(writer, obj.SpinRate ?? new VmsVector());
+				break;
+		}
+
+		switch (obj.ControlType)
+		{
+			case CT_EXPLOSION:
+				writer.Write(obj.SpawnTime ?? 0);
+				writer.Write(obj.DeleteTime ?? 0);
+				writer.Write(obj.DeleteObjNum ?? (short)0);
+				break;
+			case CT_LIGHT:
+				writer.Write(obj.LightIntensity ?? 0);
+				break;
+		}
+
+		switch (obj.RenderType)
+		{
+			case RT_MORPH:
+			case RT_POLYOBJ:
+				if (obj.Type != OBJ_ROBOT && obj.Type != OBJ_PLAYER && obj.Type != OBJ_CLUTTER)
+				{
+					writer.Write(obj.ModelNum ?? 0);
+					writer.Write(obj.SubobjFlags ?? 0);
+				}
+
+				if (obj.Type != OBJ_PLAYER && obj.Type != OBJ_DEBRIS)
+				{
+					if (obj.AnimAngles != null)
+					{
+						for (int i = 0; i < obj.AnimAngles.Length; i++)
+						{
+							WriteAngVec(writer, obj.AnimAngles[i]);
+						}
+					}
+				}
+
+				writer.Write(obj.Tmo ?? 0);
+				break;
+
+			case RT_POWERUP:
+			case RT_WEAPON_VCLIP:
+			case RT_FIREBALL:
+			case RT_HOSTAGE:
+				writer.Write(obj.VClipNum ?? 0);
+				writer.Write(obj.FrameTime ?? 0);
+				writer.Write(obj.FrameNum ?? (byte)0);
+				break;
+		}
+	}
+
+	private void WriteTriggerEvent(BinaryWriter writer, DemTriggerEvent evt)
+	{
+		writer.Write(evt.SegNum);
+		writer.Write(evt.Side);
+		writer.Write(evt.ObjNum);
+		if (_gameType == 3)
+		{
+			writer.Write(evt.Shot ?? 0);
+		}
+	}
+
+	private void WritePlayerEnergyEvent(BinaryWriter writer, DemPlayerEnergyEvent evt)
+	{
+		if (_gameType != 1)
+		{
+			writer.Write(evt.OldEnergy ?? 0);
+		}
+		writer.Write(evt.Energy);
+	}
+
+	private void WritePlayerShieldEvent(BinaryWriter writer, DemPlayerShieldEvent evt)
+	{
+		if (_gameType != 1)
+		{
+			writer.Write(evt.OldShield ?? 0);
+		}
+		writer.Write(evt.Shield);
+	}
+
+	private void WritePlayerWeaponEvent(BinaryWriter writer, DemPlayerWeaponEvent evt)
+	{
+		writer.Write(evt.WeaponType);
+		writer.Write(evt.WeaponNum);
+		if (_gameType != 1)
+		{
+			writer.Write(evt.OldWeapon ?? 0);
+		}
+	}
+
+	private void WriteNewLevelEvent(BinaryWriter writer, DemNewLevelEvent evt)
+	{
+		writer.Write(evt.NewLevel);
+		writer.Write(evt.OldLevel);
+
+		if (_gameType == 3 && _justStartedPlayback)
+		{
+			if (evt.Walls != null)
+			{
+				writer.Write(evt.Walls.Count);
+				foreach (var wall in evt.Walls)
+				{
+					writer.Write(wall.Type);
+					writer.Write(wall.Flags);
+					writer.Write(wall.State);
+					writer.Write(wall.TmapNum1);
+					writer.Write(wall.TmapNum2);
+				}
+			}
+			else
+			{
+				writer.Write(0);
+			}
+		}
+	}
+
+	private void WriteMultiConnectEvent(BinaryWriter writer, DemMultiConnectEvent evt)
+	{
+		writer.Write(evt.PlayerNum);
+		writer.Write(evt.NewPlayer);
+
+		if (evt.NewPlayer == 0)
+		{
+			WriteLengthPrefixedString(writer, evt.OldCallsign ?? string.Empty);
+			writer.Write(evt.KilledTotal ?? 0);
+			writer.Write(evt.KillsTotal ?? 0);
+		}
+
+		WriteLengthPrefixedString(writer, evt.NewCallsign);
+	}
+
+	private void WriteShortPos(BinaryWriter writer, DemObject obj)
+	{
+		var pos = obj.Position;
+
+		if (ShortPosHasByteMat(obj.RenderType, obj.Type))
+		{
+			if (pos.ByteMat != null && pos.ByteMat.Length == 9)
+			{
+				writer.Write(pos.ByteMat);
+			}
+			else
+			{
+				writer.Write(new byte[9]);
+			}
+		}
+
+		writer.Write(pos.X);
+		writer.Write(pos.Y);
+		writer.Write(pos.Z);
+		writer.Write(pos.Segment);
+		writer.Write(pos.VelX);
+		writer.Write(pos.VelY);
+		writer.Write(pos.VelZ);
+	}
+
+	private void WriteVector(BinaryWriter writer, VmsVector vec)
+	{
+		writer.Write(vec.X);
+		writer.Write(vec.Y);
+		writer.Write(vec.Z);
+	}
+
+	private void WriteAngVec(BinaryWriter writer, VmsAngvec ang)
+	{
+		writer.Write(ang.P);
+		writer.Write(ang.B);
+		writer.Write(ang.H);
+	}
+
+	private void WriteLengthPrefixedString(BinaryWriter writer, string str)
+	{
+		var bytes = System.Text.Encoding.ASCII.GetBytes(str + '\0');
+		writer.Write((byte)bytes.Length);
+		writer.Write(bytes);
 	}
 
 	private IDemEvent? ReadEvent(BinaryReader reader, byte eventType)
@@ -165,7 +807,6 @@ public class DemProcessor
 			GameMode = reader.ReadInt32()
 		};
 
-		// Store for later use
 		_version = evt.Version;
 		_gameType = evt.GameType;
 
@@ -182,8 +823,8 @@ public class DemProcessor
 			if ((evt.GameMode & GM_TEAM) != 0)
 			{
 				evt.TeamVector = reader.ReadByte();
-				evt.TeamName0 = ReadNullTerminatedString(reader);
-				evt.TeamName1 = ReadNullTerminatedString(reader);
+				evt.TeamName0 = ReadLengthPrefixedString(reader);
+				evt.TeamName1 = ReadLengthPrefixedString(reader);
 			}
 
 			if ((evt.GameMode & GM_MULTI) != 0)
@@ -195,7 +836,7 @@ public class DemProcessor
 				{
 					var player = new DemPlayerInfo
 					{
-						Callsign = ReadNullTerminatedString(reader),
+						Callsign = ReadLengthPrefixedString(reader),
 						Connected = reader.ReadByte()
 					};
 
@@ -230,7 +871,7 @@ public class DemProcessor
 			}
 
 			evt.LaserLevel = reader.ReadByte();
-			evt.CurrentMission = ReadNullTerminatedString(reader);
+			evt.CurrentMission = ReadLengthPrefixedString(reader);
 		}
 
 		evt.Energy = reader.ReadByte();
@@ -281,7 +922,6 @@ public class DemProcessor
 			Type = reader.ReadByte()
 		};
 
-		// Early return if not renderable
 		if (obj.RenderType == RT_NONE && obj.Type != OBJ_CAMERA)
 		{
 			return obj;
@@ -290,13 +930,12 @@ public class DemProcessor
 		obj.Id = reader.ReadByte();
 		obj.Flags = reader.ReadByte();
 		obj.Signature = reader.ReadInt16();
-		obj.Position = ReadShortPos(reader);
+		obj.Position = ReadShortPos(reader, obj.RenderType, obj.Type);
 
 		DetermineObjectTypes(obj, reader, out var controlType, out var movementType);
 		obj.ControlType = controlType;
 		obj.MovementType = movementType;
 
-		// Read size if not default type
 		if (obj.Type != OBJ_ROBOT && obj.Type != OBJ_HOSTAGE &&
 			obj.Type != OBJ_PLAYER && obj.Type != OBJ_POWERUP && obj.Type != OBJ_CLUTTER)
 		{
@@ -311,13 +950,12 @@ public class DemProcessor
 		}
 		else
 		{
-			reader.ReadByte(); // Skip byte
+			obj.LifeleftByte = reader.ReadByte();
 		}
 
-		// Check if boss robot is cloaked (D1 Full and D2)
-		if (_gameType >= 2 && obj.Type == OBJ_ROBOT)
+		// Only read cloaked byte for boss robots (D1 Full and D2)
+		if (_gameType >= 2 && obj.Type == OBJ_ROBOT && IsRobotBoss(obj.Id))
 		{
-			// Should read Robot_info from HAM
 			obj.Cloaked = reader.ReadByte() != 0;
 		}
 
@@ -356,8 +994,8 @@ public class DemProcessor
 
 				if (obj.Type != OBJ_PLAYER && obj.Type != OBJ_DEBRIS)
 				{
-					// Should read POF from HAM - just read something for now
-					var numAngles = 10; // MAX_SUBMODELS
+					var modelNum = GetModelNumForObject(obj);
+					var numAngles = GetNumSubmodels(modelNum);
 					obj.AnimAngles = new VmsAngvec[numAngles];
 					for (int i = 0; i < numAngles; i++)
 					{
@@ -415,21 +1053,29 @@ public class DemProcessor
 		}
 	}
 
-	private DemShortPos ReadShortPos(BinaryReader reader)
+	private static bool ShortPosHasByteMat(byte renderType, byte objectType)
 	{
-		return new DemShortPos
+		return renderType == RT_POLYOBJ || renderType == RT_HOSTAGE || renderType == RT_MORPH || objectType == OBJ_CAMERA;
+	}
+
+	private DemShortPos ReadShortPos(BinaryReader reader, byte renderType, byte objectType)
+	{
+		var sp = new DemShortPos();
+
+		if (ShortPosHasByteMat(renderType, objectType))
 		{
-			X = reader.ReadInt16(),
-			Y = reader.ReadInt16(),
-			Z = reader.ReadInt16(),
-			Segment = reader.ReadInt16(),
-			VelX = reader.ReadInt16(),
-			VelY = reader.ReadInt16(),
-			VelZ = reader.ReadInt16(),
-			Pitch = reader.ReadInt16(),
-			Bank = reader.ReadInt16(),
-			Heading = reader.ReadInt16()
-		};
+			sp.ByteMat = reader.ReadBytes(9);
+		}
+
+		sp.X = reader.ReadInt16();
+		sp.Y = reader.ReadInt16();
+		sp.Z = reader.ReadInt16();
+		sp.Segment = reader.ReadInt16();
+		sp.VelX = reader.ReadInt16();
+		sp.VelY = reader.ReadInt16();
+		sp.VelZ = reader.ReadInt16();
+
+		return sp;
 	}
 
 	private VmsVector ReadVector(BinaryReader reader)
@@ -450,15 +1096,13 @@ public class DemProcessor
 		);
 	}
 
-	private string ReadNullTerminatedString(BinaryReader reader)
+	private string ReadLengthPrefixedString(BinaryReader reader)
 	{
-		var bytes = new List<byte>();
-		byte b;
-		while ((b = reader.ReadByte()) != 0)
-		{
-			bytes.Add(b);
-		}
-		return System.Text.Encoding.ASCII.GetString(bytes.ToArray());
+		var len = reader.ReadByte();
+		var bytes = reader.ReadBytes(len);
+		// The string includes a null terminator; strip it
+		var str = System.Text.Encoding.ASCII.GetString(bytes);
+		return str.TrimEnd('\0');
 	}
 
 	private DemSoundEvent ReadSoundEvent(BinaryReader reader)
@@ -536,7 +1180,7 @@ public class DemProcessor
 
 	private DemHudMessageEvent ReadHudMessageEvent(BinaryReader reader)
 	{
-		return new DemHudMessageEvent { Message = ReadNullTerminatedString(reader) };
+		return new DemHudMessageEvent { Message = ReadLengthPrefixedString(reader) };
 	}
 
 	private DemControlCenterDestroyedEvent ReadControlCenterDestroyedEvent(BinaryReader reader)
@@ -695,12 +1339,12 @@ public class DemProcessor
 
 		if (evt.NewPlayer == 0)
 		{
-			evt.OldCallsign = ReadNullTerminatedString(reader);
+			evt.OldCallsign = ReadLengthPrefixedString(reader);
 			evt.KilledTotal = reader.ReadInt32();
 			evt.KillsTotal = reader.ReadInt32();
 		}
 
-		evt.NewCallsign = ReadNullTerminatedString(reader);
+		evt.NewCallsign = ReadLengthPrefixedString(reader);
 		return evt;
 	}
 
@@ -757,11 +1401,22 @@ public class DemProcessor
 
 	private DemLaserLevelEvent ReadLaserLevelEvent(BinaryReader reader)
 	{
-		return new DemLaserLevelEvent
+		if (_gameType == 3) // D2 uses shorts
 		{
-			OldLevel = reader.ReadInt16(),
-			NewLevel = reader.ReadInt16()
-		};
+			return new DemLaserLevelEvent
+			{
+				OldLevel = reader.ReadInt16(),
+				NewLevel = reader.ReadInt16()
+			};
+		}
+		else // D1 uses bytes
+		{
+			return new DemLaserLevelEvent
+			{
+				OldLevel = reader.ReadByte(),
+				NewLevel = reader.ReadByte()
+			};
+		}
 	}
 
 	private DemPlayerAfterburnerEvent ReadPlayerAfterburnerEvent(BinaryReader reader)

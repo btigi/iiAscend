@@ -9,4 +9,6 @@ public class DemFile
     public byte GameType { get; set; }
     
     public List<IDemEvent> Events { get; set; } = [];
+    
+    public byte[] TrailingData { get; set; } = [];
 }
