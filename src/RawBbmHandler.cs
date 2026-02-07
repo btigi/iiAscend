@@ -13,6 +13,21 @@ public class RawBbmHandler : IBbmHandler
         return !(fileData[0] == 'F' && fileData[1] == 'O' && fileData[2] == 'R' && fileData[3] == 'M');
     }
 
+    public byte[] Write(Image<Rgba32> image, List<(byte red, byte green, byte blue)> palette, bool useRleCompression = false, byte flags = 0)
+    {
+        if (palette == null || palette.Count == 0)
+            throw new ArgumentException("Palette is required for writing raw BBM format.", nameof(palette));
+
+        int width = image.Width;
+        int height = image.Height;
+        var pixelData = ImageToIndexed(image, palette, flags);
+
+        if (!useRleCompression)
+            return pixelData;
+
+        return CompressRLEForPig(pixelData, width, height);
+    }
+
     public Image<Rgba32> Read(byte[] fileData, int width, int height, List<(byte red, byte green, byte blue)>? palette, bool isRleCompressed = false, byte flags = 0)
     {
         if (palette == null || palette.Count == 0)
@@ -176,5 +191,123 @@ public class RawBbmHandler : IBbmHandler
         }
 
         return image;
+    }
+
+    private static byte[] ImageToIndexed(Image<Rgba32> image, List<(byte red, byte green, byte blue)> palette, byte flags)
+    {
+        int width = image.Width;
+        int height = image.Height;
+        var pixelData = new byte[width * height];
+
+        short transparentColor = 255;
+        bool hasTransparency = false;
+        if ((flags & 1) != 0)
+        {
+            hasTransparency = true;
+            transparentColor = 255;
+        }
+        if ((flags & 2) != 0)
+        {
+            hasTransparency = true;
+            transparentColor = 254;
+        }
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                var pixel = image[x, y];
+
+                if (hasTransparency && pixel.A < 128)
+                {
+                    pixelData[y * width + x] = (byte)transparentColor;
+                }
+                else
+                {
+                    pixelData[y * width + x] = FindClosestColorIndex(pixel.R, pixel.G, pixel.B, palette);
+                }
+            }
+        }
+
+        return pixelData;
+    }
+
+    private static byte FindClosestColorIndex(byte r, byte g, byte b, List<(byte red, byte green, byte blue)> palette)
+    {
+        int bestIndex = 0;
+        int bestDistance = int.MaxValue;
+
+        for (int i = 0; i < palette.Count; i++)
+        {
+            int dr = r - palette[i].red;
+            int dg = g - palette[i].green;
+            int db = b - palette[i].blue;
+            int distance = dr * dr + dg * dg + db * db;
+
+            if (distance == 0) return (byte)i;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+
+        return (byte)bestIndex;
+    }
+
+    private static byte[] CompressRLEForPig(byte[] pixelData, int width, int height)
+    {
+        var lineSizes = new byte[height];
+        var allLineData = new List<byte>();
+
+        for (int y = 0; y < height; y++)
+        {
+            var lineData = new List<byte>();
+            int rowStart = y * width;
+            int x = 0;
+
+            while (x < width)
+            {
+                byte pixel = pixelData[rowStart + x];
+
+                // Count run of identical pixels (max 31 due to 5-bit count field)
+                int runLen = 1;
+                while (x + runLen < width && pixelData[rowStart + x + runLen] == pixel && runLen < 31)
+                    runLen++;
+
+                // Must RLE-encode if pixel value >= 0xE0 (would be misread as RLE marker),
+                // or if a run of 3+ is worth compressing
+                if (runLen >= 3 || pixel >= 0xE0)
+                {
+                    lineData.Add((byte)(0xE0 | runLen));
+                    lineData.Add(pixel);
+                    x += runLen;
+                }
+                else
+                {
+                    // Literal byte (safe because pixel < 0xE0)
+                    lineData.Add(pixel);
+                    x++;
+                }
+            }
+
+            if (lineData.Count > 255)
+                throw new InvalidDataException($"Compressed line {y} is {lineData.Count} bytes, exceeding the 255-byte PIG RLE line size limit.");
+
+            lineSizes[y] = (byte)lineData.Count;
+            allLineData.AddRange(lineData);
+        }
+
+        // Build result: 4-byte total size + line sizes array + compressed data
+        var compressedData = new byte[height + allLineData.Count];
+        Array.Copy(lineSizes, 0, compressedData, 0, height);
+        allLineData.CopyTo(compressedData, height);
+
+        int totalSize = 4 + compressedData.Length;
+        var result = new byte[totalSize];
+        BitConverter.GetBytes(totalSize).CopyTo(result, 0);
+        Array.Copy(compressedData, 0, result, 4, compressedData.Length);
+
+        return result;
     }
 }

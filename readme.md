@@ -7,7 +7,7 @@ C# library supporting the modification of files relating to Descent, the 1995 FP
 | Name  | Read | Write | Comment |
 |-------|:----:|-------|:--------|
 | 256   | ✔   |  ✔  |
-| BBM   | ✔   |  ✗  | Two variants
+| BBM   | ✔   |  ✔  | BBM/IFF
 | BNK   | ✔   |  ✔  |
 | DEM   | ✔   |  ✔  |
 | DIG   | ✗   |  ✗  |

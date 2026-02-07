@@ -31,6 +31,18 @@ public class BbmProcessor
         throw new InvalidDataException("No suitable handler found for BBM data.");
     }
 
+    public byte[] Write(Image<Rgba32> image, List<(byte red, byte green, byte blue)> palette, bool useRleCompression = false, byte flags = 0)
+    {
+        return _handlers.OfType<RawBbmHandler>().First()
+            .Write(image, palette, useRleCompression, flags);
+    }
+
+    public byte[] WriteIff(Image<Rgba32> image, List<(byte red, byte green, byte blue)> palette, bool useRleCompression = false, byte flags = 0)
+    {
+        return _handlers.OfType<IffBbmHandler>().First()
+            .Write(image, palette, useRleCompression, flags);
+    }
+
     public static bool IsIffFormat(byte[] fileData)
     {
         if (fileData.Length < 4)

@@ -42,6 +42,96 @@ public class IffBbmHandler : IBbmHandler
         return ParseIff(fileData);
     }
 
+    public byte[] Write(Image<Rgba32> image, List<(byte red, byte green, byte blue)> palette, bool useRleCompression = false, byte flags = 0)
+    {
+        if (palette == null || palette.Count == 0)
+            throw new ArgumentException("Palette is required for writing IFF BBM format.", nameof(palette));
+
+        var (pixelData, transparentColor, masking) = ImageToIndexed(image, palette, flags);
+
+        short width = (short)image.Width;
+        short height = (short)image.Height;
+        byte nPlanes = 8;
+        byte compression = useRleCompression ? CmpByteRun1 : CmpNone;
+
+        byte[] bodyData;
+        if (useRleCompression)
+        {
+            bodyData = CompressByteRun1(pixelData, width, height);
+        }
+        else
+        {
+            int rowStride = width + (width % 2);
+            if (rowStride != width)
+            {
+                bodyData = new byte[height * rowStride];
+                for (int y = 0; y < height; y++)
+                    Array.Copy(pixelData, y * width, bodyData, y * rowStride, width);
+            }
+            else
+            {
+                bodyData = pixelData;
+            }
+        }
+
+        // Build CMAP data (256 colors, 768 bytes)
+        var cmapData = new byte[256 * 3];
+        for (int i = 0; i < 256 && i < palette.Count; i++)
+        {
+            cmapData[i * 3] = palette[i].red;
+            cmapData[i * 3 + 1] = palette[i].green;
+            cmapData[i * 3 + 2] = palette[i].blue;
+        }
+
+        // Build BMHD data (20 bytes)
+        var bmhdData = new byte[20];
+        int bp = 0;
+        WriteInt16BE(bmhdData, ref bp, width);
+        WriteInt16BE(bmhdData, ref bp, height);
+        WriteInt16BE(bmhdData, ref bp, 0); // x origin
+        WriteInt16BE(bmhdData, ref bp, 0); // y origin
+        bmhdData[bp++] = nPlanes;
+        bmhdData[bp++] = masking;
+        bmhdData[bp++] = compression;
+        bmhdData[bp++] = 0; // pad
+        WriteInt16BE(bmhdData, ref bp, transparentColor);
+        bmhdData[bp++] = 1; // xAspect
+        bmhdData[bp++] = 1; // yAspect
+        WriteInt16BE(bmhdData, ref bp, width);  // pageWidth
+        WriteInt16BE(bmhdData, ref bp, height); // pageHeight
+
+        // Calculate total FORM content length
+        // PBM type (4) + BMHD chunk (8 + 20) + CMAP chunk (8 + 768) + BODY chunk (8 + bodyData.Length [+ 1 pad])
+        int bodyChunkPad = (bodyData.Length % 2 == 1) ? 1 : 0;
+        int formContentLen = 4 + (8 + 20) + (8 + cmapData.Length) + (8 + bodyData.Length + bodyChunkPad);
+
+        var result = new byte[8 + formContentLen]; // FORM sig (4) + length (4) + content
+        int pos = 0;
+
+        WriteUInt32BE(result, ref pos, FormSig);
+        WriteUInt32BE(result, ref pos, (uint)formContentLen);
+        WriteUInt32BE(result, ref pos, PbmSig);
+
+        WriteUInt32BE(result, ref pos, BmhdSig);
+        WriteUInt32BE(result, ref pos, 20);
+        Array.Copy(bmhdData, 0, result, pos, 20);
+        pos += 20;
+
+        WriteUInt32BE(result, ref pos, CmapSig);
+        WriteUInt32BE(result, ref pos, (uint)cmapData.Length);
+        Array.Copy(cmapData, 0, result, pos, cmapData.Length);
+        pos += cmapData.Length;
+
+        WriteUInt32BE(result, ref pos, BodySig);
+        WriteUInt32BE(result, ref pos, (uint)bodyData.Length);
+        Array.Copy(bodyData, 0, result, pos, bodyData.Length);
+        pos += bodyData.Length;
+        if (bodyChunkPad > 0)
+            result[pos++] = 0;
+
+        return result;
+    }
+
     private Image<Rgba32> ParseIff(byte[] data)
     {
         int pos = 0;
@@ -376,5 +466,144 @@ public class IffBbmHandler : IBbmHandler
             (byte)((sig >> 8) & 0xFF),
             (byte)(sig & 0xFF)
         });
+    }
+
+    private static (byte[] pixelData, short transparentColor, byte masking) ImageToIndexed(
+        Image<Rgba32> image, List<(byte red, byte green, byte blue)> palette, byte flags)
+    {
+        int width = image.Width;
+        int height = image.Height;
+        var pixelData = new byte[width * height];
+
+        short transparentColor = 255;
+        byte masking = MskNone;
+        if ((flags & 1) != 0)
+        {
+            masking = MskHasTransparentColor;
+            transparentColor = 255;
+        }
+        if ((flags & 2) != 0)
+        {
+            masking = MskHasTransparentColor;
+            transparentColor = 254;
+        }
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                var pixel = image[x, y];
+
+                if (masking == MskHasTransparentColor && pixel.A < 128)
+                {
+                    pixelData[y * width + x] = (byte)transparentColor;
+                }
+                else
+                {
+                    pixelData[y * width + x] = FindClosestColorIndex(pixel.R, pixel.G, pixel.B, palette);
+                }
+            }
+        }
+
+        return (pixelData, transparentColor, masking);
+    }
+
+    private static byte FindClosestColorIndex(byte r, byte g, byte b, List<(byte red, byte green, byte blue)> palette)
+    {
+        int bestIndex = 0;
+        int bestDistance = int.MaxValue;
+
+        for (int i = 0; i < palette.Count; i++)
+        {
+            int dr = r - palette[i].red;
+            int dg = g - palette[i].green;
+            int db = b - palette[i].blue;
+            int distance = dr * dr + dg * dg + db * db;
+
+            if (distance == 0) return (byte)i;
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+
+        return (byte)bestIndex;
+    }
+
+    private static byte[] CompressByteRun1(byte[] pixelData, short width, short height)
+    {
+        int rowStride = width + (width % 2); // Pad rows to even length
+        var result = new List<byte>();
+
+        for (int y = 0; y < height; y++)
+        {
+            // Build padded row
+            var row = new byte[rowStride];
+            Array.Copy(pixelData, y * width, row, 0, width);
+
+            CompressRowByteRun1(row, result);
+        }
+
+        return result.ToArray();
+    }
+
+    private static void CompressRowByteRun1(byte[] row, List<byte> output)
+    {
+        int len = row.Length;
+        int i = 0;
+
+        while (i < len)
+        {
+            int runStart = i;
+            byte runByte = row[i];
+            int runLen = 1;
+
+            while (i + runLen < len && row[i + runLen] == runByte && runLen < 128)
+                runLen++;
+
+            if (runLen >= 3)
+            {
+                // Encode as run: -(count-1), byte
+                output.Add((byte)(sbyte)(-(runLen - 1)));
+                output.Add(runByte);
+                i += runLen;
+            }
+            else
+            {
+                int literalStart = i;
+                int literalCount = 0;
+
+                while (i < len && literalCount < 128)
+                {
+                    if (i + 2 < len && row[i] == row[i + 1] && row[i] == row[i + 2])
+                        break;
+
+                    literalCount++;
+                    i++;
+                }
+
+                if (literalCount > 0)
+                {
+                    output.Add((byte)(literalCount - 1));
+                    for (int j = 0; j < literalCount; j++)
+                        output.Add(row[literalStart + j]);
+                }
+            }
+        }
+    }
+
+    private static void WriteUInt32BE(byte[] data, ref int pos, uint value)
+    {
+        data[pos++] = (byte)((value >> 24) & 0xFF);
+        data[pos++] = (byte)((value >> 16) & 0xFF);
+        data[pos++] = (byte)((value >> 8) & 0xFF);
+        data[pos++] = (byte)(value & 0xFF);
+    }
+
+    private static void WriteInt16BE(byte[] data, ref int pos, short value)
+    {
+        data[pos++] = (byte)((value >> 8) & 0xFF);
+        data[pos++] = (byte)(value & 0xFF);
     }
 }
