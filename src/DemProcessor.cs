@@ -731,9 +731,18 @@ public class DemProcessor
 
 	private void WriteLengthPrefixedString(BinaryWriter writer, string str)
 	{
-		var bytes = System.Text.Encoding.ASCII.GetBytes(str + '\0');
-		writer.Write((byte)bytes.Length);
-		writer.Write(bytes);
+		if (_gameType == 3) // D2: no null terminator
+		{
+			var bytes = System.Text.Encoding.ASCII.GetBytes(str);
+			writer.Write((byte)bytes.Length);
+			writer.Write(bytes);
+		}
+		else // D1: includes null terminator in length and data
+		{
+			var bytes = System.Text.Encoding.ASCII.GetBytes(str + '\0');
+			writer.Write((byte)bytes.Length);
+			writer.Write(bytes);
+		}
 	}
 
 	private IDemEvent? ReadEvent(BinaryReader reader, byte eventType)
@@ -1100,7 +1109,7 @@ public class DemProcessor
 	{
 		var len = reader.ReadByte();
 		var bytes = reader.ReadBytes(len);
-		// The string includes a null terminator; strip it
+		// D1 includes a null terminator in the string data; D2 does not.
 		var str = System.Text.Encoding.ASCII.GetString(bytes);
 		return str.TrimEnd('\0');
 	}
